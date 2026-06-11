@@ -172,9 +172,7 @@ function renderTable(){
   document.getElementById('footerNote').textContent=`Showing ${rows.length} of ${USERS.length} users · Revoke = ChatGPT licensed with 0 messages in period · Claude "—" = not found in audit logs`;
   document.getElementById('tableBody').innerHTML=rows.map(u=>{
     const gm=u.gpt_status==='not_invited'?'—':(u.gpt_messages||0);
-    const claudeBadge=u.claude_activity==='No License'
-      ?`<span style="color:#b3bac5">—</span>`
-      :`<span class="badge ${bc(u.claude_activity)}">${u.claude_activity}</span>`;
+    const claudeBadge=`<span class="badge ${bc(u.claude_activity)}">${u.claude_activity}</span>`;
     const claudeEvts=u.claude_events>0?u.claude_events:`<span style="color:#b3bac5">—</span>`;
     const claudeLast=u.claude_last_active||`<span style="color:#b3bac5">—</span>`;
     const act=u.recommend_revoke?`<span class="badge b-revoke">⚠ Revoke</span>`:`<span style="color:#b3bac5;font-size:12px">—</span>`;
