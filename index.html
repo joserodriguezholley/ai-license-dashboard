@@ -62,9 +62,20 @@ td.em{color:#5e6c84;font-size:12px}
   <input type="text" id="searchBox" placeholder="Search name or email…" oninput="renderTable()">
   <select id="filterStatus" onchange="renderTable()">
     <option value="all">All Users</option>
-    <option value="active">Active on ChatGPT</option>
-    <option value="inactive">Inactive on ChatGPT</option>
-    <option value="revoke">Revoke Candidates</option>
+    <optgroup label="ChatGPT">
+      <option value="gpt-active">Active on ChatGPT</option>
+      <option value="gpt-inactive">Inactive on ChatGPT</option>
+    </optgroup>
+    <optgroup label="Claude">
+      <option value="claude-active">Active on Claude</option>
+      <option value="claude-inactive">Inactive on Claude</option>
+      <option value="claude-nodata">No Claude Activity</option>
+    </optgroup>
+    <optgroup label="Combined">
+      <option value="active-both">Active on Both</option>
+      <option value="inactive-both">Inactive on Both</option>
+      <option value="revoke">Revoke Candidates</option>
+    </optgroup>
   </select>
   <select id="filterDept" onchange="renderTable()"></select>
   <div class="tab-group">
@@ -131,8 +142,13 @@ function getFiltered(){
   return USERS.filter(u=>{
     if(q&&!u.name.toLowerCase().includes(q)&&!u.email.toLowerCase().includes(q))return false;
     if(tab==='revoke'&&!u.recommend_revoke)return false;
-    if(st==='active'&&u.gpt_messages===0)return false;
-    if(st==='inactive'&&u.gpt_messages>0)return false;
+    if(st==='gpt-active'&&u.gpt_messages===0)return false;
+    if(st==='gpt-inactive'&&u.gpt_messages>0)return false;
+    if(st==='claude-active'&&u.claude_events===0)return false;
+    if(st==='claude-inactive'&&(u.claude_events>0||u.claude_activity!=='No Data'))return false;
+    if(st==='claude-nodata'&&u.claude_activity!=='No Data')return false;
+    if(st==='active-both'&&(u.gpt_messages===0||u.claude_events===0))return false;
+    if(st==='inactive-both'&&(u.gpt_messages>0||u.claude_events>0))return false;
     if(st==='revoke'&&!u.recommend_revoke)return false;
     if(dp!=='all'&&u.department!==dp)return false;
     return true;
