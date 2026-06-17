@@ -52,7 +52,33 @@ td.em{color:#5e6c84;font-size:12px}
 .b-revoke-both{background:#172b4d;color:white}
 .no-results{text-align:center;padding:40px;color:#6b778c;font-size:13px}
 .footer-note{padding:0 28px 14px;font-size:11px;color:#97a0af}
+.cost-panel{padding:0 28px 28px}
+.cost-section-title{font-size:13px;font-weight:700;color:#172b4d;margin:18px 0 10px;text-transform:uppercase;letter-spacing:.5px}
+.cost-stats{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+.cost-stat{flex:1;min-width:130px;background:white;border:1px solid #dfe1e6;border-radius:8px;padding:12px 16px}
+.cost-stat.highlight{border-color:#0052cc;background:#f0f7ff}
+.cost-stat-num{font-size:22px;font-weight:700;color:#172b4d;line-height:1}
+.cost-stat-label{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:#6b778c;margin-top:4px;font-weight:600}
+.cost-chart-wrap{background:white;border:1px solid #dfe1e6;border-radius:8px;padding:20px;margin-bottom:18px;max-height:340px}
+.cost-legend{font-size:11px;color:#6b778c;margin-bottom:12px;display:flex;gap:18px;flex-wrap:wrap}
+.cost-legend span{display:flex;align-items:center;gap:5px}
+.cost-legend i{display:inline-block;width:28px;height:3px;border-radius:2px}
+.cost-table-wrap{overflow-x:auto;background:white;border:1px solid #dfe1e6;border-radius:8px}
+.cost-table{width:100%;border-collapse:collapse;font-size:12px}
+.cost-table th{background:#f4f5f7;padding:8px 12px;text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:#6b778c;font-weight:700;border-bottom:2px solid #dfe1e6;white-space:nowrap}
+.cost-table th:first-child{text-align:left}
+.cost-table td{padding:7px 12px;text-align:right;border-bottom:1px solid #f4f5f7;color:#172b4d}
+.cost-table td:first-child{text-align:left;font-weight:600;color:#42526e}
+.cost-table tr.planned td{background:#fffde7}
+.cost-table tr.forecast td{background:#e8f4fd;font-style:italic}
+.cost-table tr.total-row td{background:#f4f5f7;font-weight:700;border-top:2px solid #dfe1e6}
+.cost-table .up{color:#de350b}.cost-table .dn{color:#006644}
+.cost-badge{display:inline-block;border-radius:3px;padding:1px 5px;font-size:9px;font-weight:700;text-transform:uppercase}
+.cb-actual{background:#e3fcef;color:#006644}
+.cb-planned{background:#fff0b3;color:#5e4200}
+.cb-forecast{background:#e6f3ff;color:#0052cc}
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 </head>
 <body>
 <div class="header">
@@ -86,6 +112,7 @@ td.em{color:#5e6c84;font-size:12px}
   <div class="tab-group">
     <button class="tab-btn active" id="tab-all" onclick="setTab('all')">All Users <span class="cnt" id="cnt-all">—</span></button>
     <button class="tab-btn" id="tab-revoke" onclick="setTab('revoke')">⚠ Revoke Candidates <span class="cnt" id="cnt-revoke">—</span></button>
+    <button class="tab-btn" id="tab-costs" onclick="setTab('costs')">💰 Costs &amp; Forecast</button>
   </div>
 </div>
 <div class="table-wrap">
@@ -105,6 +132,30 @@ td.em{color:#5e6c84;font-size:12px}
     <tbody id="tableBody"></tbody>
   </table>
   <div class="no-results" id="noResults" style="display:none">No users match the current filters.</div>
+</div>
+
+<div id="costsPanel" class="cost-panel" style="display:none">
+  <div class="cost-section-title">Spend Overview</div>
+  <div class="cost-stats" id="costStats"></div>
+  <div class="cost-section-title">Monthly Cost Trend &amp; Forecast</div>
+  <div class="cost-legend">
+    <span><i style="background:#0052cc"></i> ChatGPT</span>
+    <span><i style="background:#6554c0"></i> Claude</span>
+    <span><i style="background:#172b4d"></i> Combined</span>
+    <span style="color:#b3bac5">│ Actual &nbsp;┆ Planned &nbsp;┅ Forecast</span>
+  </div>
+  <div class="cost-chart-wrap"><canvas id="costChart" height="110"></canvas></div>
+  <div class="cost-section-title">Monthly Breakdown</div>
+  <div class="cost-table-wrap"><table class="cost-table">
+    <thead><tr>
+      <th>Month</th><th>Type</th>
+      <th>GPT Seats</th><th>GPT Tokens</th><th>GPT Total</th>
+      <th>Claude Seats</th><th>Claude Tokens</th><th>Claude Total</th>
+      <th>Combined</th><th>MoM Δ</th>
+    </tr></thead>
+    <tbody id="costTableBody"></tbody>
+    <tfoot><tr class="total-row" id="costTotalsRow"></tr></tfoot>
+  </table></div>
 </div>
 <div class="footer-note" id="footerNote"></div>
 <script>
@@ -208,11 +259,133 @@ function renderTable(){
   }).join('');
 }
 
+
+// ── COST DATA ────────────────────────────────────────────────────────────
+const COST_DATA=[
+  // month, gpt_seat, gpt_token, claude_seat, claude_token, type
+  // type: 'actual'=Jan-Jun 2026, 'planned'=Jul-Dec 2026, 'forecast'=Jan-Jun 2027
+  {m:'Jan \'26', gs:0,       gt:0,    cs:0,       ct:0,       t:'actual'},
+  {m:'Feb \'26', gs:0,       gt:0,    cs:0,       ct:0,       t:'actual'},
+  {m:'Mar \'26', gs:0,       gt:0,    cs:0,       ct:0,       t:'actual'},
+  {m:'Apr \'26', gs:6737.50, gt:0,    cs:393.75,  ct:522.44,  t:'actual'},
+  {m:'May \'26', gs:6737.50, gt:0,    cs:1023.75, ct:3361.00, t:'actual'},
+  {m:'Jun \'26', gs:6737.50, gt:0,    cs:1023.75, ct:6800.00, t:'actual'},
+  {m:'Jul \'26', gs:6737.50, gt:0,    cs:1181.25, ct:7480.00, t:'planned'},
+  {m:'Aug \'26', gs:6737.50, gt:0,    cs:1181.25, ct:7554.80, t:'planned'},
+  {m:'Sep \'26', gs:6737.50, gt:0,    cs:1181.25, ct:7630.35, t:'planned'},
+  {m:'Oct \'26', gs:6737.50, gt:0,    cs:1181.25, ct:7706.65, t:'planned'},
+  {m:'Nov \'26', gs:6737.50, gt:5000, cs:1181.25, ct:7783.72, t:'planned'},
+  {m:'Dec \'26', gs:6737.50, gt:5000, cs:1181.25, ct:7861.56, t:'planned'},
+  {m:'Jan \'27', gs:6737.50, gt:5000, cs:1181.25, ct:7940.17, t:'forecast'},
+  {m:'Feb \'27', gs:6737.50, gt:5000, cs:1181.25, ct:8019.55, t:'forecast'},
+  {m:'Mar \'27', gs:6737.50, gt:5000, cs:1181.25, ct:8099.71, t:'forecast'},
+  {m:'Apr \'27', gs:6737.50, gt:5000, cs:1181.25, ct:8180.65, t:'forecast'},
+  {m:'May \'27', gs:6737.50, gt:5000, cs:1181.25, ct:8262.38, t:'forecast'},
+  {m:'Jun \'27', gs:6737.50, gt:5000, cs:1181.25, ct:8344.91, t:'forecast'},
+];
+COST_DATA.forEach(r=>{r.gpt=r.gs+r.gt; r.claude=r.cs+r.ct; r.total=r.gpt+r.claude;});
+
+let costChart=null;
+function fmt(v){return v===0?'—':'$'+v.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
+
+function renderCosts(){
+  // Stats
+  const actual=COST_DATA.filter(r=>r.t==='actual');
+  const planned=COST_DATA.filter(r=>r.t==='planned');
+  const forecast=COST_DATA.filter(r=>r.t==='forecast');
+  const ytd=actual.reduce((s,r)=>s+r.total,0);
+  const lastActual=actual[actual.length-1];
+  const runRate=lastActual?lastActual.total:0;
+  const fullYear2026=[...actual,...planned].reduce((s,r)=>s+r.total,0);
+  const next6=forecast.reduce((s,r)=>s+r.total,0);
+  document.getElementById('costStats').innerHTML=[
+    {label:'2026 YTD Actual (Jan–Jun)',num:fmt(ytd),hi:false},
+    {label:'Current Monthly Run Rate',num:fmt(runRate),hi:true},
+    {label:'2026 Full-Year (Planned)',num:fmt(fullYear2026),hi:false},
+    {label:'Next 6-Month Forecast',num:fmt(next6),hi:false},
+  ].map(c=>`<div class="cost-stat${c.hi?' highlight':''}">
+    <div class="cost-stat-num">${c.num}</div>
+    <div class="cost-stat-label">${c.label}</div>
+  </div>`).join('');
+
+  // Chart
+  const labels=COST_DATA.map(r=>r.m);
+  const gptData=COST_DATA.map(r=>r.gpt||null);
+  const claudeData=COST_DATA.map(r=>r.claude||null);
+  const combinedData=COST_DATA.map(r=>r.total||null);
+
+  // Split combined into solid (actual+planned) and dashed (forecast) for visual distinction
+  const combinedActual=COST_DATA.map((r,i)=>r.t!=='forecast'?r.total:null);
+  const combinedForecast=COST_DATA.map((r,i)=>r.t==='forecast'||i===11?r.total:null); // overlap at Dec
+
+  if(costChart){costChart.destroy();}
+  const ctx=document.getElementById('costChart').getContext('2d');
+  costChart=new Chart(ctx,{
+    type:'bar',
+    data:{
+      labels,
+      datasets:[
+        {label:'ChatGPT',data:gptData,backgroundColor:COST_DATA.map(r=>r.t==='forecast'?'rgba(0,82,204,0.25)':r.t==='planned'?'rgba(0,82,204,0.5)':'rgba(0,82,204,0.85)'),borderRadius:3,stack:'s'},
+        {label:'Claude', data:claudeData,backgroundColor:COST_DATA.map(r=>r.t==='forecast'?'rgba(101,84,192,0.25)':r.t==='planned'?'rgba(101,84,192,0.5)':'rgba(101,84,192,0.85)'),borderRadius:3,stack:'s'},
+        {label:'Combined (actual/planned)',data:combinedActual,type:'line',borderColor:'#172b4d',backgroundColor:'transparent',borderWidth:2,pointRadius:3,pointBackgroundColor:'#172b4d',tension:0.3,order:0},
+        {label:'Combined (forecast)',data:combinedForecast,type:'line',borderColor:'#172b4d',backgroundColor:'transparent',borderWidth:2,borderDash:[5,4],pointRadius:3,pointBackgroundColor:'#172b4d',tension:0.3,order:0},
+      ]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:true,
+      interaction:{mode:'index',intersect:false},
+      plugins:{
+        legend:{display:false},
+        tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: $${ctx.parsed.y.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}`}}
+      },
+      scales:{
+        x:{grid:{display:false},ticks:{font:{size:10}}},
+        y:{grid:{color:'#f4f5f7'},ticks:{callback:v=>'$'+v.toLocaleString(),font:{size:10}}}
+      }
+    }
+  });
+
+  // Table
+  let prev=null;
+  document.getElementById('costTableBody').innerHTML=COST_DATA.map(r=>{
+    const mom=prev!==null&&r.total>0&&prev>0?r.total-prev:null;
+    const momStr=mom===null?'—':(mom>=0?'<span class="up">+'+fmt(mom)+'</span>':'<span class="dn">'+fmt(mom)+'</span>');
+    if(r.total>0)prev=r.total;
+    const badge=`<span class="cost-badge cb-${r.t}">${r.t}</span>`;
+    return `<tr class="${r.t==='forecast'?'forecast':r.t==='planned'?'planned':''}">
+      <td>${r.m}</td><td>${badge}</td>
+      <td>${fmt(r.gs)}</td><td>${fmt(r.gt)}</td><td><strong>${fmt(r.gpt)}</strong></td>
+      <td>${fmt(r.cs)}</td><td>${fmt(r.ct)}</td><td><strong>${fmt(r.claude)}</strong></td>
+      <td><strong>${fmt(r.total)}</strong></td><td>${momStr}</td>
+    </tr>`;
+  }).join('');
+
+  // Totals row
+  const sumField=f=>COST_DATA.reduce((s,r)=>s+r[f],0);
+  document.getElementById('costTotalsRow').innerHTML=
+    `<td>Total</td><td></td>
+     <td>${fmt(sumField('gs'))}</td><td>${fmt(sumField('gt'))}</td><td><strong>${fmt(sumField('gpt'))}</strong></td>
+     <td>${fmt(sumField('cs'))}</td><td>${fmt(sumField('ct'))}</td><td><strong>${fmt(sumField('claude'))}</strong></td>
+     <td><strong>${fmt(sumField('total'))}</strong></td><td>—</td>`;
+}
+
 function setTab(t){
   tab=t;
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('tab-'+t).classList.add('active');
-  renderTable();
+  if(t==='costs'){
+    document.querySelector('.controls').style.display='none';
+    document.querySelector('.table-wrap').style.display='none';
+    document.getElementById('costsPanel').style.display='block';
+    document.querySelector('.footer-note').style.display='none';
+    renderCosts();
+  } else {
+    document.querySelector('.controls').style.display='';
+    document.querySelector('.table-wrap').style.display='';
+    document.getElementById('costsPanel').style.display='none';
+    document.querySelector('.footer-note').style.display='';
+    renderTable();
+  }
 }
 renderStats();renderTable();
 </script>
