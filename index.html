@@ -87,7 +87,7 @@ td.em{color:#5e6c84;font-size:12px}
 </div>
 <div class="data-banner">📊 Data snapshot: <strong>Apr 1 – Jun 10, 2026</strong> &nbsp;·&nbsp; Claude column shows "—" where no audit log activity exists (user may not have a Claude license)</div>
 <div class="stats-bar" id="statsBar"></div>
-<div class="controls">
+<div class="controls" id="controlsBar">
   <input type="text" id="searchBox" placeholder="Search name or email…" oninput="renderTable()">
   <select id="filterStatus" onchange="renderTable()">
     <option value="all">All Users</option>
@@ -115,7 +115,7 @@ td.em{color:#5e6c84;font-size:12px}
     <button class="tab-btn" id="tab-costs" onclick="setTab('costs')">💰 Costs &amp; Forecast</button>
   </div>
 </div>
-<div class="table-wrap">
+<div class="table-wrap" id="tableWrap">
   <table>
     <thead><tr>
       <th onclick="sortBy('name')">Name<span class="si">↕</span></th>
@@ -373,19 +373,12 @@ function setTab(t){
   tab=t;
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('tab-'+t).classList.add('active');
-  if(t==='costs'){
-    document.querySelector('.controls').style.display='none';
-    document.querySelector('.table-wrap').style.display='none';
-    document.getElementById('costsPanel').style.display='block';
-    document.querySelector('.footer-note').style.display='none';
-    renderCosts();
-  } else {
-    document.querySelector('.controls').style.display='';
-    document.querySelector('.table-wrap').style.display='';
-    document.getElementById('costsPanel').style.display='none';
-    document.querySelector('.footer-note').style.display='';
-    renderTable();
-  }
+  const isCosts = t==='costs';
+  document.getElementById('controlsBar').style.display = isCosts ? 'none' : 'flex';
+  document.getElementById('tableWrap').style.display   = isCosts ? 'none' : 'block';
+  document.getElementById('footerNote').style.display  = isCosts ? 'none' : 'block';
+  document.getElementById('costsPanel').style.display  = isCosts ? 'block' : 'none';
+  if(isCosts){ renderCosts(); } else { renderTable(); }
 }
 renderStats();renderTable();
 </script>
