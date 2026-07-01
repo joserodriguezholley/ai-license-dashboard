@@ -200,7 +200,7 @@ function renderStats(){
     {num:rvg,label:'Revoke ChatGPT',cls:'red'},
     {num:rvc,label:'Revoke Claude',cls:'red'},
   ].map(c=>`<div class="stat-card${c.d?' danger':''}"><div class="stat-num ${c.cls}">${c.num}</div><div class="stat-label">${c.label}</div></div>`).join('');
-  const depts=[...new Set(USERS.map(u=>u.department).filter(Boolean))].sort();
+  const depts=[...new Set(USERS.map(u=>u.dept).filter(Boolean))].sort();
   document.getElementById('filterDept').innerHTML='<option value="all">All Departments</option>'+depts.map(d=>`<option value="${d}">${d}</option>`).join('');
 }
 
@@ -223,7 +223,7 @@ function getFiltered(){
     if(st==='revoke'&&!u.recommend_revoke)return false;
     if(st==='revoke-gpt'&&!u.revoke_gpt)return false;
     if(st==='revoke-claude'&&!u.revoke_claude)return false;
-    if(dp!=='all'&&u.department!==dp)return false;
+    if(dp!=='all'&&u.dept!==dp)return false;
     return true;
   });
 }
@@ -260,7 +260,7 @@ function renderTable(){
     if(u.revoke_gpt&&u.revoke_claude){act='<span class="badge b-revoke-both">⚠ Revoke Both</span>';}
     else if(u.revoke_gpt){act='<span class="badge b-revoke-gpt">⚠ Revoke ChatGPT</span>';}
     else if(u.revoke_claude){act='<span class="badge b-revoke-claude">⚠ Revoke Claude</span>';}
-    const dept=u.department||'—';
+    const dept=u.dept||'—';
     return `<tr class="${u.recommend_revoke?'rr':''}">
       <td class="nm" title="${u.name}">${u.name||'<em style="color:#97a0af">Unknown</em>'}</td>
       <td class="em" title="${u.email}">${u.email}</td>
@@ -380,4 +380,4 @@ function setTab(t){
 renderStats();renderTable();
 </script>
 </body>
-</html>
+</html>                                                                                                                                                                                                                                                        
