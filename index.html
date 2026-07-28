@@ -198,11 +198,15 @@ function renderStats(){
   const rv=USERS.filter(u=>u.recommend_revoke).length;
   const rvg=USERS.filter(u=>u.revoke_gpt).length;
   const rvc=USERS.filter(u=>u.revoke_claude).length;
+  const colic=USERS.filter(u=>['Active','Moderate','Low','Inactive','Licensed'].includes(u.copilot_activity)).length;
+  const cola=USERS.filter(u=>['Active','Moderate','Low'].includes(u.copilot_activity)).length;
   document.getElementById('statsBar').innerHTML=[
     {num:lic,label:'GPT Licensed',cls:'blue'},
     {num:ga,label:'GPT Active',cls:'green'},
     {num:gi+gp,label:'GPT Inactive/Pending',cls:'orange'},
     {num:ca,label:'Claude Active',cls:'green'},
+    {num:colic,label:'Copilot Licensed',cls:'blue'},
+    {num:cola,label:'Copilot Active',cls:'green'},
     {num:rv,label:'Revoke Candidates',cls:'red',d:1},
     {num:rvg,label:'Revoke ChatGPT',cls:'red'},
     {num:rvc,label:'Revoke Claude',cls:'red'},
