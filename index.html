@@ -96,28 +96,36 @@ td.em{color:#5e6c84;font-size:12px}
 </div>
 <div class="controls" id="controlsBar">
   <input type="text" id="searchBox" placeholder="Search name or email…" oninput="renderTable()">
-  <select id="filterStatus" onchange="renderTable()">
-    <option value="all">All Users</option>
-    <optgroup label="ChatGPT">
-      <option value="gpt-active">Active on ChatGPT</option>
-      <option value="gpt-inactive">Inactive on ChatGPT</option>
-    </optgroup>
-    <optgroup label="Claude">
-      <option value="claude-active">Active on Claude</option>
-      <option value="claude-inactive">Inactive on Claude</option>
-      <option value="claude-nodata">No Claude Activity</option>
-    </optgroup>
-    <optgroup label="Copilot">
-      <option value="copilot-active">Active on Copilot</option>
-      <option value="copilot-inactive">Inactive on Copilot</option>
-    </optgroup>
-    <optgroup label="Combined">
-      <option value="active-both">Active on Both</option>
-      <option value="inactive-both">Inactive on Both</option>
-      <option value="revoke">Revoke Candidates (All)</option>
-          <option value="revoke-gpt">Revoke ChatGPT</option>
-          <option value="revoke-claude">Revoke Claude</option>
-    </optgroup>
+  <select id="filterGptStatus" onchange="renderTable()" title="Filter by ChatGPT status">
+    <option value="all">All GPT</option>
+    <option value="Active">GPT: Active</option>
+    <option value="Moderate">GPT: Moderate</option>
+    <option value="Low">GPT: Low</option>
+    <option value="Inactive">GPT: Inactive</option>
+    <option value="No License">GPT: No License</option>
+  </select>
+  <select id="filterClaudeStatus" onchange="renderTable()" title="Filter by Claude status">
+    <option value="all">All Claude</option>
+    <option value="Active">Claude: Active</option>
+    <option value="Moderate">Claude: Moderate</option>
+    <option value="Low">Claude: Low</option>
+    <option value="Inactive">Claude: Inactive</option>
+    <option value="No License">Claude: No License</option>
+  </select>
+  <select id="filterCopilotStatus" onchange="renderTable()" title="Filter by Copilot status">
+    <option value="all">All Copilot</option>
+    <option value="Active">Copilot: Active</option>
+    <option value="Moderate">Copilot: Moderate</option>
+    <option value="Low">Copilot: Low</option>
+    <option value="Inactive">Copilot: Inactive</option>
+    <option value="Licensed">Copilot: Licensed</option>
+    <option value="No License">Copilot: No License</option>
+  </select>
+  <select id="filterRevoke" onchange="renderTable()" title="Filter by revoke status">
+    <option value="all">All Actions</option>
+    <option value="revoke">⚠ Revoke Candidates</option>
+    <option value="revoke-gpt">⚠ Revoke ChatGPT</option>
+    <option value="revoke-claude">⚠ Revoke Claude</option>
   </select>
   <select id="filterDept" onchange="renderTable()"></select>
   <select id="filterMonth" onchange="renderTable()"></select>
@@ -130,10 +138,8 @@ td.em{color:#5e6c84;font-size:12px}
       <th onclick="sortBy('department')">Dept<span class="si">↕</span></th>
       <th onclick="sortBy('gpt_activity')">ChatGPT Status<span class="si">↕</span></th>
       <th onclick="sortBy('gpt_messages')">GPT Msgs<span class="si">↕</span></th>
-      <th onclick="sortBy('gpt_last_active')">GPT Last Active<span class="si">↕</span></th>
       <th onclick="sortBy('claude_activity')">Claude Status<span class="si">↕</span></th>
       <th onclick="sortBy('claude_events')">Claude Events<span class="si">↕</span></th>
-      <th onclick="sortBy('claude_last_active')">Claude Last Active<span class="si">↕</span></th>
       <th onclick="sortBy('claude_cost_usd')">Claude Cost<span class="si">↕</span></th>
       <th onclick="sortBy('copilot_activity')">Copilot Status<span class="si">↕</span></th>
       <th onclick="sortBy('copilot_interactions')">Copilot Events<span class="si">↕</span></th>
@@ -215,25 +221,24 @@ function renderStats(){
 
 function getFiltered(){
   const q=document.getElementById('searchBox').value.toLowerCase();
-  const st=document.getElementById('filterStatus').value;
+  const gst=document.getElementById('filterGptStatus').value;
+  const cst=document.getElementById('filterClaudeStatus').value;
+  const pst=document.getElementById('filterCopilotStatus').value;
+  const rv=document.getElementById('filterRevoke').value;
   const dp=document.getElementById('filterDept').value;
   const mo=document.getElementById('filterMonth').value;
   return USERS.filter(u=>{
     const cEvts = mo==='all' ? u.claude_events : (u.claude_monthly&&u.claude_monthly[mo]||0);
+    const cAct  = mo==='all' ? u.claude_activity :
+      (cEvts===0&&u.claude_events===0?'No License':cEvts===0?'Inactive':cEvts>=50?'Active':cEvts>=10?'Moderate':'Low');
     if(q&&!u.name.toLowerCase().includes(q)&&!u.email.toLowerCase().includes(q))return false;
     if(tab==='revoke'&&!u.recommend_revoke)return false;
-    if(st==='gpt-active'&&u.gpt_messages===0)return false;
-    if(st==='gpt-inactive'&&u.gpt_messages>0)return false;
-    if(st==='claude-active'&&cEvts===0)return false;
-    if(st==='claude-inactive'&&(cEvts>0||u.claude_activity!=='No License'))return false;
-    if(st==='claude-nodata'&&u.claude_activity!=='No License')return false;
-    if(st==='active-both'&&(u.gpt_messages===0||cEvts===0))return false;
-    if(st==='inactive-both'&&(u.gpt_messages>0||cEvts>0))return false;
-    if(st==='revoke'&&!u.recommend_revoke)return false;
-    if(st==='revoke-gpt'&&!u.revoke_gpt)return false;
-    if(st==='revoke-claude'&&!u.revoke_claude)return false;
-    if(st==='copilot-active'&&(u.copilot_interactions||0)===0)return false;
-    if(st==='copilot-inactive'&&(u.copilot_interactions||0)>0)return false;
+    if(gst!=='all'&&u.gpt_activity!==gst)return false;
+    if(cst!=='all'&&cAct!==cst)return false;
+    if(pst!=='all'&&u.copilot_activity!==pst)return false;
+    if(rv==='revoke'&&!u.recommend_revoke)return false;
+    if(rv==='revoke-gpt'&&!u.revoke_gpt)return false;
+    if(rv==='revoke-claude'&&!u.revoke_claude)return false;
     if(dp!=='all'&&u.dept!==dp)return false;
     return true;
   });
@@ -266,7 +271,6 @@ function renderTable(){
        cCount>=50 ? 'Active' : cCount>=10 ? 'Moderate' : 'Low');
     const claudeBadge=`<span class="badge ${bc(cActivity)}">${cActivity}</span>`;
     const claudeEvts=cCount>0?cCount:`<span style="color:#b3bac5">—</span>`;
-    const claudeLast=u.claude_last_active||`<span style="color:#b3bac5">—</span>`;
     let act='<span style="color:#b3bac5;font-size:12px">—</span>';
     if(u.revoke_gpt&&u.revoke_claude){act='<span class="badge b-revoke-both">⚠ Revoke Both</span>';}
     else if(u.revoke_gpt){act='<span class="badge b-revoke-gpt">⚠ Revoke ChatGPT</span>';}
@@ -278,10 +282,8 @@ function renderTable(){
       <td title="${dept}">${dept}</td>
       <td><span class="badge ${bc(u.gpt_activity)}">${u.gpt_activity}</span></td>
       <td style="font-variant-numeric:tabular-nums">${gm}</td>
-      <td>${u.gpt_last_active||'—'}</td>
       <td>${claudeBadge}</td>
       <td>${claudeEvts}</td>
-      <td>${claudeLast}</td>
       <td style="font-variant-numeric:tabular-nums">${(()=>{const c=mo2==="all"?u.claude_cost_usd:(u.claude_monthly_cost&&u.claude_monthly_cost[mo2])||0;return c>0?"$"+c.toFixed(2):"\u2014";})()}</td>
       <td><span class="badge ${bc(u.copilot_activity)}">${u.copilot_activity}</span></td>
       <td style="font-variant-numeric:tabular-nums">${u.copilot_interactions||0}</td>
