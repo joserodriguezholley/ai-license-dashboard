@@ -282,7 +282,7 @@ function renderTable(){
       <td>${claudeBadge}</td>
       <td>${claudeEvts}</td>
       <td>${claudeLast}</td>
-      <td style="font-variant-numeric:tabular-nums">${(()=>{const c=mo2===\'all\'?u.claude_cost_usd:(u.claude_monthly_cost&&u.claude_monthly_cost[mo2])||0;return c>0?"$"+c.toFixed(2):"—";})()}</td>
+      <td style="font-variant-numeric:tabular-nums">${(()=>{const c=mo2==="all"?u.claude_cost_usd:(u.claude_monthly_cost&&u.claude_monthly_cost[mo2])||0;return c>0?"$"+c.toFixed(2):"\u2014";})()}</td>
       <td><span class="badge ${bc(u.copilot_activity)}">${u.copilot_activity}</span></td>
       <td style="font-variant-numeric:tabular-nums">${u.copilot_interactions||0}</td>
       <td>${act}</td>
