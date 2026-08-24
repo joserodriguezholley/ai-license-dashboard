@@ -22,6 +22,11 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#f4f5f7;color:#172b4
 .controls{display:flex;gap:10px;padding:12px 28px;flex-wrap:wrap;align-items:center;background:white;border-bottom:1px solid #dfe1e6}
 .controls input[type=text]{padding:7px 11px;border:1px solid #dfe1e6;border-radius:4px;font-size:13px;width:220px}
 .controls select{padding:7px 9px;border:1px solid #dfe1e6;border-radius:4px;font-size:13px;background:white;cursor:pointer}
+.month-btn{padding:7px 9px;border:1px solid #dfe1e6;border-radius:4px;font-size:13px;background:white;cursor:pointer;white-space:nowrap}
+.month-panel{position:absolute;top:calc(100% + 2px);left:0;background:white;border:1px solid #dfe1e6;border-radius:4px;box-shadow:0 4px 12px rgba(0,0,0,.12);z-index:999;min-width:160px;padding:6px 0}
+.month-panel label{display:flex;align-items:center;gap:7px;padding:5px 12px;font-size:13px;cursor:pointer;white-space:nowrap}
+.month-panel label:hover{background:#f4f5f7}
+.month-panel hr{margin:4px 0;border:none;border-top:1px solid #dfe1e6}
 .tab-group{display:flex;border:1px solid #dfe1e6;border-radius:4px;overflow:hidden;margin-left:auto}
 .tab-btn{padding:6px 14px;font-size:12px;border:none;background:white;cursor:pointer;color:#42526e;transition:background .15s;white-space:nowrap}
 .tab-btn.active{background:#0052cc;color:white;font-weight:600}
@@ -128,7 +133,10 @@ td.em{color:#5e6c84;font-size:12px}
     <option value="revoke-claude">⚠ Revoke Claude</option>
   </select>
   <select id="filterDept" onchange="renderTable()"></select>
-  <select id="filterMonth" onchange="renderTable()"></select>
+  <div id="monthDropdown" style="position:relative;display:inline-block">
+    <button id="monthBtn" class="month-btn" onclick="toggleMonthDD(event)">All Months ▾</button>
+    <div id="monthPanel" class="month-panel" style="display:none"></div>
+  </div>
   </div>
 <div class="table-wrap" id="tableWrap">
   <table>
@@ -216,8 +224,18 @@ function renderStats(){
   const depts=[...new Set(USERS.map(u=>u.dept).filter(Boolean))].sort();
   document.getElementById('filterDept').innerHTML='<option value="all">All Departments</option>'+depts.map(d=>`<option value="${d}">${d}</option>`).join('');
   const months=[...new Set(USERS.flatMap(u=>Object.keys(u.claude_monthly||{})))].sort();
-  document.getElementById('filterMonth').innerHTML='<option value="all">All Months</option>'+months.map(m=>{const d=new Date(m+'-02');return`<option value="${m}">${d.toLocaleString('default',{month:'short',year:'numeric'})}</option>`;}).join('');
+  document.getElementById('monthPanel').innerHTML=
+    '<label><input type="checkbox" id="monthAllCb" checked onchange="monthAllToggle(this)"> All Months</label><hr>'+
+    months.map(m=>{const d=new Date(m+'-02');return`<label><input type="checkbox" class="month-cb" value="${m}" onchange="monthCbChange()"> ${d.toLocaleString('default',{month:'short',year:'numeric'})}</label>`;}).join('');
+  document.addEventListener('click', e=>{if(!document.getElementById('monthDropdown').contains(e.target)){document.getElementById('monthPanel').style.display='none';}}, {capture:true, once:false});
+  window._monthDDListener=true;
 }
+
+function toggleMonthDD(e){e.stopPropagation();const p=document.getElementById('monthPanel');p.style.display=p.style.display==='none'?'block':'none';}
+function getSelectedMonths(){const allCb=document.getElementById('monthAllCb');if(!allCb||allCb.checked)return null;const checked=[...document.querySelectorAll('#monthPanel .month-cb:checked')].map(c=>c.value);return checked.length?checked:null;}
+function updateMonthBtn(){const mos=getSelectedMonths();const btn=document.getElementById('monthBtn');if(!mos){btn.textContent='All Months ▾';return;}const labels=mos.map(m=>new Date(m+'-02').toLocaleString('default',{month:'short',year:'numeric'}));btn.textContent=labels.join(', ')+' ▾';}
+function monthAllToggle(cb){document.querySelectorAll('#monthPanel .month-cb').forEach(c=>c.checked=false);cb.checked=true;updateMonthBtn();renderTable();}
+function monthCbChange(){const allCb=document.getElementById('monthAllCb');const checked=[...document.querySelectorAll('#monthPanel .month-cb:checked')];allCb.checked=checked.length===0;updateMonthBtn();renderTable();}
 
 function getFiltered(){
   const q=document.getElementById('searchBox').value.toLowerCase();
@@ -226,10 +244,10 @@ function getFiltered(){
   const pst=document.getElementById('filterCopilotStatus').value;
   const rv=document.getElementById('filterRevoke').value;
   const dp=document.getElementById('filterDept').value;
-  const mo=document.getElementById('filterMonth').value;
+  const mos=getSelectedMonths();
   return USERS.filter(u=>{
-    const cEvts = mo==='all' ? u.claude_events : (u.claude_monthly&&u.claude_monthly[mo]||0);
-    const cAct  = mo==='all' ? u.claude_activity :
+    const cEvts = !mos ? u.claude_events : mos.reduce((s,m)=>s+(u.claude_monthly&&u.claude_monthly[m]||0),0);
+    const cAct  = !mos ? u.claude_activity :
       (cEvts===0&&u.claude_events===0?'No License':cEvts===0?'Inactive':cEvts>=50?'Active':cEvts>=10?'Moderate':'Low');
     if(q&&!u.name.toLowerCase().includes(q)&&!u.email.toLowerCase().includes(q))return false;
     if(tab==='revoke'&&!u.recommend_revoke)return false;
@@ -263,9 +281,9 @@ function renderTable(){
   document.getElementById('footerNote').textContent=`Showing ${rows.length} of ${USERS.length} users · Revoke = ≤6 messages/events in period (ChatGPT licensed or Claude active) · Claude "—" = not found in audit logs`;
   document.getElementById('tableBody').innerHTML=rows.map(u=>{
     const gm=u.gpt_status==='not_invited'?'—':(u.gpt_messages||0);
-    const mo2=document.getElementById('filterMonth').value;
-    const cCount = mo2==='all' ? u.claude_events : (u.claude_monthly&&u.claude_monthly[mo2]||0);
-    const cActivity = mo2==='all' ? u.claude_activity :
+    const mos2=getSelectedMonths();
+    const cCount = !mos2 ? u.claude_events : mos2.reduce((s,m)=>s+(u.claude_monthly&&u.claude_monthly[m]||0),0);
+    const cActivity = !mos2 ? u.claude_activity :
       (cCount===0&&u.claude_events===0 ? 'No License' :
        cCount===0 ? 'Inactive (this month)' :
        cCount>=50 ? 'Active' : cCount>=10 ? 'Moderate' : 'Low');
@@ -284,7 +302,7 @@ function renderTable(){
       <td style="font-variant-numeric:tabular-nums">${gm}</td>
       <td>${claudeBadge}</td>
       <td>${claudeEvts}</td>
-      <td style="font-variant-numeric:tabular-nums">${(()=>{const c=mo2==="all"?u.claude_cost_usd:(u.claude_monthly_cost&&u.claude_monthly_cost[mo2])||0;return c>0?"$"+c.toFixed(2):"\u2014";})()}</td>
+      <td style="font-variant-numeric:tabular-nums">${(()=>{const c=!mos2?u.claude_cost_usd:mos2.reduce((s,m)=>s+((u.claude_monthly_cost&&u.claude_monthly_cost[m])||0),0);return c>0?"$"+c.toFixed(2):"\u2014";})()}</td>
       <td><span class="badge ${bc(u.copilot_activity)}">${u.copilot_activity}</span></td>
       <td style="font-variant-numeric:tabular-nums">${u.copilot_interactions||0}</td>
       <td>${act}</td>
