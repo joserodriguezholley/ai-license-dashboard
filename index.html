@@ -266,8 +266,15 @@ function sortBy(c){sortDir=sortCol===c?-sortDir:-1;sortCol=c;renderTable();}
 
 function renderTable(){
   let rows=getFiltered();
+  const _mos=getSelectedMonths();
+  // Pre-compute month-filtered cost/events so sorting reflects what's displayed
+  rows=rows.map(u=>Object.assign({},u,{
+    _sortCost:   !_mos ? u.claude_cost_usd   : _mos.reduce((s,m)=>s+((u.claude_monthly_cost&&u.claude_monthly_cost[m])||0),0),
+    _sortEvents: !_mos ? u.claude_events      : _mos.reduce((s,m)=>s+(u.claude_monthly&&u.claude_monthly[m]||0),0)
+  }));
+  const _sortField=c=>c==='claude_cost_usd'?'_sortCost':c==='claude_events'?'_sortEvents':c;
   rows.sort((a,b)=>{
-    let va=a[sortCol],vb=b[sortCol];
+    let va=a[_sortField(sortCol)],vb=b[_sortField(sortCol)];
     if(typeof va==='boolean'){va=va?1:0;vb=vb?1:0;}
     if(typeof va==='number')return(va-vb)*sortDir;
     return String(va||'').localeCompare(String(vb||''))*sortDir;
